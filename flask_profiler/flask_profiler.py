@@ -1,12 +1,12 @@
 # -*- coding: utf8 -*-
 
 import functools
+import io
+import logging
 import re
 import time
 
 from pprint import pprint as pp
-
-import logging
 
 from flask import Blueprint
 from flask import jsonify
@@ -14,6 +14,13 @@ from flask import request
 from flask_httpauth import HTTPBasicAuth
 
 from . import storage
+
+try:
+    from cProfile import Profile
+except ImportError:
+    from profile import Profile
+
+from pstats import Stats
 
 CONF = {}
 collection = None
@@ -32,7 +39,7 @@ def verify_password(username, password):
     c = CONF["basicAuth"]
     if username == c["username"] and password == c["password"]:
         return True
-    logging.warn("flask-profiler authentication failed")
+    logging.warning("flask-profiler authentication failed")
     return False
 
 
@@ -45,11 +52,12 @@ class Measurement(object):
         self.context = context
         self.name = name
         self.method = method
-        self.args = args
-        self.kwargs = kwargs
+        self.args = [str(arg) for arg in args]
+        self.kwargs = {str(k): str(v) for k, v in kwargs.items()}
         self.startedAt = 0
         self.endedAt = 0
         self.elapsed = 0
+        self.stats = ""
 
     def __json__(self):
         return {
@@ -60,21 +68,33 @@ class Measurement(object):
             "startedAt": self.startedAt,
             "endedAt": self.endedAt,
             "elapsed": self.elapsed,
+            "stats": self.stats,
             "context": self.context
         }
 
     def __str__(self):
         return str(self.__json__())
 
-    def start(self):
-        # we use default_timer to get the best clock available.
-        # see: http://stackoverflow.com/a/25823885/672798
+    def run(self, f, *args, **kwargs):
         self.startedAt = time.time()
 
-    def stop(self):
-        self.endedAt = time.time()
-        self.elapsed = round(
-            self.endedAt - self.startedAt, self.DECIMAL_PLACES)
+        p = Profile()
+
+        try:
+            returnVal = p.runcall(f, *args, **kwargs)
+        except:
+            raise
+        finally:
+            self.endedAt = time.time()
+            self.elapsed = round(self.endedAt - self.startedAt, self.DECIMAL_PLACES)
+
+            s = io.StringIO()
+            stats = Stats(p, stream=s)
+            stats.print_stats(30)
+
+            self.stats = s.getvalue()
+
+        return returnVal
 
 
 def is_ignored(name, conf):
@@ -103,14 +123,12 @@ def measure(f, name, method, context=None):
             return f(*args, **kwargs)
 
         measurement = Measurement(name, args, kwargs, method, context)
-        measurement.start()
 
         try:
-            returnVal = f(*args, **kwargs)
+            returnVal = measurement.run(f, *args, **kwargs)
         except:
             raise
         finally:
-            measurement.stop()
             if CONF.get("verbose", False):
                 pp(measurement.__json__())
             collection.insert(measurement.__json__())
@@ -125,10 +143,10 @@ def wrapHttpEndpoint(f):
     def wrapper(*args, **kwargs):
         context = {
             "url": request.base_url,
-            "args": dict(request.args.items()),
-            "form": dict(request.form.items()),
+            "args": {str(k): str(v) for k, v in request.args.items()},
+            "form": {str(k): str(v) for k, v in request.form.items()},
             "body": request.data.decode("utf-8", "strict"),
-            "headers": dict(request.headers.items()),
+            "headers": {str(k): str(v) for k, v in request.headers.items()},
             "func": request.endpoint,
             "ip": request.remote_addr
         }
@@ -233,7 +251,8 @@ def registerInternalRouters(app):
             "status": collection.truncate()})
         return response
 
-    @fp.after_request
+    # Causes error "Attempted implicit sequence conversion but the response object is in direct passthrough mode."
+    #@fp.after_request
     def x_robots_tag_header(response):
         response.headers['X-Robots-Tag'] = 'noindex, nofollow'
         return response
@@ -265,7 +284,7 @@ def init_app(app):
 
     basicAuth = CONF.get("basicAuth", None)
     if not basicAuth or not basicAuth["enabled"]:
-        logging.warn(" * CAUTION: flask-profiler is working without basic auth!")
+        logging.warning(" * CAUTION: flask-profiler is working without basic auth!")
 
 
 class Profiler(object):

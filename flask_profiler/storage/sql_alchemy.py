@@ -22,6 +22,7 @@ class Measurements(base):
     id = Column(Integer, primary_key=True)
     startedAt = Column(Numeric)
     endedAt = Column(Numeric)
+    stats = Column(Text)
     elapsed = Column(Numeric(10, 4))
     method = Column(Text)
     args = Column(Text)
@@ -63,6 +64,7 @@ class Sqlalchemy(BaseStorage):
         endedAt = int(kwds.get('endedAt', None))
         startedAt = int(kwds.get('startedAt', None))
         elapsed = Decimal(kwds.get('elapsed', None))
+        stats = kwds.get('stats', None)
         if elapsed:
             elapsed = elapsed.quantize(Decimal('.0001'), rounding=ROUND_UP)
         args = json.dumps(list(kwds.get('args', ())))  # tuple -> list -> json
@@ -76,6 +78,7 @@ class Sqlalchemy(BaseStorage):
             endedAt=endedAt,
             startedAt=startedAt,
             elapsed=elapsed,
+            stats=stats,
             args=args,
             kwargs=kwargs,
             context=context,
@@ -139,6 +142,7 @@ class Sqlalchemy(BaseStorage):
             "startedAt": row.startedAt,
             "endedAt": row.endedAt,
             "elapsed": row.elapsed,
+            "stats": row.stats,
             "method": row.method,
             "args": tuple(json.loads(row.args)),  # json -> list -> tuple
             "kwargs": json.loads(row.kwargs),

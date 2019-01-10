@@ -41,7 +41,7 @@ class MeasurementTest(BasetTest):
         m = list(flask_profiler.collection.filter())[0]
         self.assertEqual(m["name"], name)
         self.assertEqual(m["method"], method)
-        self.assertEqual(m["args"][0], waitSeconds)
+        self.assertEqual(m["args"][0], str(waitSeconds))
         self.assertEqual(m["kwargs"], kwargs)
         self.assertEqual(m["context"], context)
         self.assertTrue(float(m["elapsed"]) >= waitSeconds)

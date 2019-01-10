@@ -11,7 +11,7 @@ app.config["flask_profiler"] = {
     "verbose": True,
     "enabled": app.config["DEBUG"],
     "storage": {
-        "engine": "sqlalchmey",
+        "engine": "sqlalchemy",
         "db_url": "sqlite:///flask_profiler.sql"  # optional
     },
     "basicAuth":{

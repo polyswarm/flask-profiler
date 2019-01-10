@@ -22,6 +22,7 @@ class Sqlite(BaseStorage):
         self.startedAt_head = 'startedAt'  # name of the column
         self.endedAt_head = 'endedAt'  # name of the column
         self.elapsed_head = 'elapsed'  # name of the column
+        self.stats_head = 'stats'
         self.method_head = 'method'
         self.args_head = 'args'
         self.kwargs_head = 'kwargs'
@@ -71,6 +72,7 @@ class Sqlite(BaseStorage):
             {startedAt} REAL,
             {endedAt} REAL,
             {elapsed} REAL,
+            {stats} TEXT,
             {args} TEXT,
             {kwargs} TEXT,
             {method} TEXT,
@@ -82,6 +84,7 @@ class Sqlite(BaseStorage):
                 startedAt=self.startedAt_head,
                 endedAt=self.endedAt_head,
                 elapsed=self.elapsed_head,
+                stats=self.stats_head,
                 args=self.args_head,
                 kwargs=self.kwargs_head,
                 method=self.method_head,
@@ -108,6 +111,7 @@ class Sqlite(BaseStorage):
         endedAt = float(kwds.get('endedAt', None))
         startedAt = float(kwds.get('startedAt', None))
         elapsed = kwds.get('elapsed', None)
+        stats = kwds.get('stats', None)
         args = json.dumps(list(kwds.get('args', ())))  # tuple -> list -> json
         kwargs = json.dumps(kwds.get('kwargs', ()))
         context = json.dumps(kwds.get('context', {}))
@@ -115,12 +119,13 @@ class Sqlite(BaseStorage):
         name = kwds.get('name', None)
 
         sql = """INSERT INTO {0} VALUES (
-            null, ?, ?, ?, ?,?, ?, ?, ?)""".format(self.table_name)
+            null, ?, ?, ?, ?, ?,?, ?, ?, ?)""".format(self.table_name)
 
         self.cursor.execute(sql, (
                 startedAt,
                 endedAt,
                 elapsed,
+                stats,
                 args,
                 kwargs,
                 method,
@@ -259,11 +264,12 @@ class Sqlite(BaseStorage):
             "startedAt": row[1],
             "endedAt": row[2],
             "elapsed": row[3],
-            "args": tuple(json.loads(row[4])),  # json -> list -> tuple
-            "kwargs": json.loads(row[5]),
-            "method": row[6],
-            "context": json.loads(row[7]),
-            "name": row[8]
+            "stats": row[4],
+            "args": tuple(json.loads(row[5])),  # json -> list -> tuple
+            "kwargs": json.loads(row[6]),
+            "method": row[7],
+            "context": json.loads(row[8]),
+            "name": row[9]
         }
 
         return data
