@@ -47,7 +47,7 @@ class Measurement(object):
     """represents an endpoint measurement"""
     DECIMAL_PLACES = 6
 
-    def __init__(self, name, args, kwargs, method, context=None):
+    def __init__(self, name, args, kwargs, method, restrictions, sort_field, context=None):
         super(Measurement, self).__init__()
         self.context = context
         self.name = name
@@ -57,6 +57,8 @@ class Measurement(object):
         self.startedAt = 0
         self.endedAt = 0
         self.elapsed = 0
+        self.restrictions = restrictions
+        self.sort_field = sort_field
         self.stats = ""
 
     def __json__(self):
@@ -90,7 +92,8 @@ class Measurement(object):
 
             s = io.StringIO()
             stats = Stats(p, stream=s)
-            stats.print_stats(30)
+            stats.sort_stats(self.sort_field)
+            stats.print_stats(self.restrictions)
 
             self.stats = s.getvalue()
 
@@ -122,7 +125,9 @@ def measure(f, name, method, context=None):
         if 'sampling_function' in CONF and not CONF['sampling_function']():
             return f(*args, **kwargs)
 
-        measurement = Measurement(name, args, kwargs, method, context)
+        restrictions = CONF.get('restrictions', 30)
+        sort_field = CONF.get('sort_field', 'cumulative')
+        measurement = Measurement(name, args, kwargs, method, restrictions, sort_field, context)
 
         try:
             returnVal = measurement.run(f, *args, **kwargs)
@@ -279,8 +284,13 @@ def init_app(app):
 
     collection = storage.getCollection(CONF.get("storage", {}))
 
-    wrapAppEndpoints(app)
-    registerInternalRouters(app)
+    enableMeasurement = CONF.get('measurement', False)
+    if enableMeasurement:
+        wrapAppEndpoints(app)
+
+    enableGui = CONF.get('gui', False)
+    if enableGui:
+        registerInternalRouters(app)
 
     basicAuth = CONF.get("basicAuth", None)
     if not basicAuth or not basicAuth["enabled"]:

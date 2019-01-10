@@ -1,4 +1,5 @@
 import json
+import logging
 from decimal import Decimal, ROUND_UP
 from .base import BaseStorage
 from datetime import datetime
@@ -10,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import func
 
 base = declarative_base()
+logger = logging.getLogger("flask-profiler")
 
 
 def formatDate(timestamp, dateFormat):
@@ -58,7 +60,10 @@ class Sqlalchemy(BaseStorage):
         return self
 
     def create_database(self):
-        base.metadata.create_all(self.db)
+        try:
+            base.metadata.create_all(self.db)
+        except:
+            logger.exception('Error creating tables, assuming previously created')
 
     def insert(self, kwds):
         endedAt = int(kwds.get('endedAt', None))
@@ -237,7 +242,7 @@ class Sqlalchemy(BaseStorage):
         filters = Sqlalchemy.getFilters(kwds)
         session = sessionmaker(self.db)()
         if kwds.get('interval', None) == "daily":
-            interval = 3600 * 24   # daily
+            interval = 3600 * 24  # daily
             dateFormat = "%Y-%m-%d"
             format = "day"
         else:

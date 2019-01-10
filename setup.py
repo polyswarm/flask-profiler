@@ -51,6 +51,9 @@ setup(
             'static/dist/index.html',
             ]
         },
+    entry_points = {
+        'console_scripts': ['flask-profiler=flask_profiler.__main__:main'],
+    },
     test_suite="tests.suite",
     zip_safe=False,
     platforms='any',
